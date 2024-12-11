@@ -1,0 +1,30 @@
+.super Ljava/lang/Object;
+
+# Direct methods
+.method public static isEmulator(Landroid/content/Context;)Z
+    .locals 2
+    .param p0, "context"    # Landroid/content/Context;
+
+    const-string v0, "ro.kernel.qemu"
+    invoke-static {v0}, Landroid/os/SystemProperties;->get(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object v1
+
+    const-string v0, "1"
+    invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    move-result v0
+
+    return v0
+.end method
+
+.method public static showEmulatorToast(Landroid/content/Context;)V
+    .locals 2
+    .param p0, "context"    # Landroid/content/Context;
+
+    const-string v0, "App is running on an emulator!"
+    const/4 v1, 0x1  # Toast.LENGTH_SHORT
+    invoke-static {p0, v0, v1}, Landroid/widget/Toast;->makeText(Landroid/content/Context;Ljava/lang/CharSequence;I)Landroid/widget/Toast;
+    move-result-object v0
+    invoke-virtual {v0}, Landroid/widget/Toast;->show()V
+
+    return-void
+.end method
