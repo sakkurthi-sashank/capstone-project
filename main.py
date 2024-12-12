@@ -3,8 +3,32 @@ import subprocess
 import sys
 import re
 import xml.etree.ElementTree as ET
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import requests
+
+app = FastAPI()
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class RequestBody(BaseModel):
+    apk_url: str
+
 
 android_package_name = ""
+
+OUTPUT_BASE_DIR = "decompiled_apks"
+os.makedirs(OUTPUT_BASE_DIR, exist_ok=True)
 
 
 def run_command(cmd):
@@ -289,10 +313,22 @@ def find_main_activity(temp_dir):
     return None
 
 
-def main(apk_path):
-    if not os.path.isfile(apk_path):
-        print(f"APK file does not exist: {apk_path}")
-        sys.exit(1)
+def main(apk_url):
+
+    os.makedirs(OUTPUT_BASE_DIR, exist_ok=True)
+
+    response = requests.get(apk_url, stream=True)
+
+    if response.status_code != 200:
+        raise HTTPException(status_code=400, detail="Failed to download APK")
+
+    apk_name = os.path.basename(apk_url)
+    apk_path = os.path.join(OUTPUT_BASE_DIR, apk_name)
+
+    with open(apk_path, "wb") as apk_file:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                apk_file.write(chunk)
 
     temp_dir = os.path.join(os.getcwd(), "temp")
     if not os.path.exists(temp_dir):
@@ -330,10 +366,16 @@ def main(apk_path):
     print(f"APK successfully signed and saved to {signed_apk_path}")
 
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python script.py <path_to_apk>")
-        sys.exit(1)
+@app.get("/")
+async def read_root():
+    return {"message": "Hello World"}
 
-    apk_path = sys.argv[1]
-    main(apk_path)
+
+@app.post("/apk-decompile")
+async def decompile_apk(request: RequestBody):
+
+    apk_url = request.apk_url
+
+    main(apk_url)
+
+    return {"message": "APK decompiled successfully."}
