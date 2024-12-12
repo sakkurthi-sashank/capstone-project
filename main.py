@@ -43,46 +43,129 @@ def sign_apk(apk_path, output_path, keystore_path, alias, password):
     run_command(cmd)
 
 
+# def update_main_activity(main_activity_path):
+
+#     lines_to_insert = f"""
+
+#     invoke-static {{p0}}, L{android_package_name.replace(
+#         ".", "/"
+#     )}/usb_detection;->detectUSBDebugging(Landroid/content/Context;)V
+
+#     move-object v3, p0
+#     check-cast v3, Landroid/content/Context;
+#     invoke-static {{v3}}, L{android_package_name.replace(
+#         ".", "/"
+#     )}/cheat_tool_detection;->checkCheatTools(Landroid/content/Context;)Z
+#     move-result v4
+
+#     if-eqz v4, :show_safe
+
+#     const-string v5, "Cheat tool detected!"
+#     goto :show_toast
+
+#     :show_safe
+#     const-string v5, "No Cheat tool detected, App is safe to use!"
+
+#     :show_toast
+#     const/4 v4, 0x1
+#     invoke-static {{v3, v5, v4}}, Landroid/widget/Toast;->makeText(Landroid/content/Context;Ljava/lang/CharSequence;I)Landroid/widget/Toast;
+#     move-result-object v4
+#     invoke-virtual {{v4}}, Landroid/widget/Toast;->show()V
+
+#     invoke-static {{p0}}, L{android_package_name.replace(
+#         ".", "/"
+#     )}/rooting_detection;->isDeviceRooted()Z
+
+#     move-result v0
+
+#     .line 12
+
+#     if-eqz v0, :cond_safe
+
+#     const-string v1, "Phone is rooted!"
+
+#     goto :cond_show
+
+#     :cond_safe
+#     const-string v1, "Phone is not rooted, safe to use."
+
+#     :cond_show
+#     move-object v2, p0
+
+#     invoke-static {{p0}}, L{android_package_name.replace(
+#         ".", "/"
+#     )}/emulator_detection;->isEmulator(Landroid/content/Context;)Z
+#     move-result v0
+
+#     if-eqz v0, :no_emulator  # If not an emulator, skip the Toast display
+
+#     invoke-static {{p0}}, L{android_package_name.replace(
+#         ".", "/"
+#     )}/emulator_detection;->showEmulatorToast(Landroid/content/Context;)V
+
+#     :no_emulator
+#     """
+
+import os
+
+
 def update_main_activity(main_activity_path):
+    """
+    Updates the MainActivity file with the specified security checks.
+
+    Args:
+        main_activity_path: The path to the MainActivity.java file.
+        android_package_name: The package name of the Android app.
+
+    Raises:
+        ValueError: If the insertion point cannot be found in the MainActivity file.
+    """
 
     lines_to_insert = f"""
-    
-    invoke-static {{p0}}, L{android_package_name.replace(
-        ".", "/"
-    )}/usb_detection;->detectUSBDebugging(Landroid/content/Context;)V
+    invoke-static {{p0}}, L{android_package_name.replace(".", "/")}/usb_detection;->detectUSBDebugging(Landroid/content/Context;)V
 
     move-object v3, p0
     check-cast v3, Landroid/content/Context;
-    invoke-static {{v3}}, L{android_package_name.replace(
-        ".", "/"
-    )}/cheat_tool_detection;->checkCheatTools(Landroid/content/Context;)Z
+    invoke-static {{v3}}, L{android_package_name.replace(".", "/")}/cheat_tool_detection;->checkCheatTools(Landroid/content/Context;)Z
     move-result v4
-    
+
     if-eqz v4, :show_safe
-    
+
     const-string v5, "Cheat tool detected!"
     goto :show_toast
-    
+
     :show_safe
     const-string v5, "No Cheat tool detected, App is safe to use!"
-    
+
     :show_toast
     const/4 v4, 0x1
     invoke-static {{v3, v5, v4}}, Landroid/widget/Toast;->makeText(Landroid/content/Context;Ljava/lang/CharSequence;I)Landroid/widget/Toast;
     move-result-object v4
     invoke-virtual {{v4}}, Landroid/widget/Toast;->show()V
 
+    invoke-static {{}}, L{android_package_name.replace(".", "/")}/rooting_detection;->isDeviceRooted()Z
+    move-result v0
 
-    invoke-static {{p0}}, L{android_package_name.replace(
-        ".", "/"
-    )}/emulator_detection;->isEmulator(Landroid/content/Context;)Z
+    if-eqz v0, :cond_safe
+
+    const-string v1, "Phone is rooted!"
+    goto :show_toast_rooting
+
+    :cond_safe
+    const-string v1, "Phone is not rooted, safe to use."
+
+    :show_toast_rooting
+    const/4 v4, 0x1
+    invoke-static {{v3, v5, v4}}, Landroid/widget/Toast;->makeText(Landroid/content/Context;Ljava/lang/CharSequence;I)Landroid/widget/Toast;
+    move-result-object v4
+    invoke-virtual {{v4}}, Landroid/widget/Toast;->show()V
+
+    invoke-static {{p0}}, L{android_package_name.replace(".", "/")}/emulator_detection;->isEmulator(Landroid/content/Context;)Z
     move-result v0
 
     if-eqz v0, :no_emulator  # If not an emulator, skip the Toast display
 
-    invoke-static {{p0}}, L{android_package_name.replace(
-        ".", "/"
-    )}/emulator_detection;->showEmulatorToast(Landroid/content/Context;)V
+    invoke-static {{p0}}, L{android_package_name.replace(".", "/")}/emulator_detection;->showEmulatorToast(Landroid/content/Context;)V
 
     :no_emulator
     """
@@ -135,6 +218,8 @@ def create_detection_files(base_dir, smali_impl_dir):
     files_mapping = {
         "emulator_detection.smali": "emulator_detection.txt",
         "usb_detection.smali": "usb_detection.txt",
+        "cheat_tool_detection.smali": "cheat_tool_detection.txt",
+        "rooting_detection.smali": "rooting_detection.txt",
     }
 
     for smali_file, txt_file in files_mapping.items():
