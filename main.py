@@ -282,6 +282,8 @@ def find_main_activity(temp_dir):
 
 def main(apk_url):
 
+    print(f"Decompiling APK from URL: {apk_url}")
+
     os.makedirs(OUTPUT_BASE_DIR, exist_ok=True)
 
     response = requests.get(apk_url, stream=True)
@@ -328,8 +330,8 @@ def main(apk_url):
     generate_signing_key(keystore_path, alias, password)
 
     signed_apk_path = "signed_output.apk"
-    upload_url = upload_to_azure(signed_apk_path, "signed_output.apk")
     sign_apk("unsigned_output.apk", signed_apk_path, keystore_path, alias, password)
+    upload_url = upload_to_azure(signed_apk_path, "signed_output.apk")
 
     print(f"APK successfully signed and saved to {signed_apk_path}")
 

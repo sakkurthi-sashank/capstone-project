@@ -3,3 +3,4 @@ signed_output.apk
 unsigned_output.apk
 keystore.jks
 decompiled_apks
+temp_copy
