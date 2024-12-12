@@ -1,0 +1,41 @@
+.super Ljava/lang/Object;
+
+.method public static runSecurityChecks(Landroid/content/Context;)V
+    .locals 6  # Define sufficient registers for the method
+
+    # USB Debugging Detection
+    invoke-static {p0}, Lcom/nativenerds/develapp/USBDetection;->detectUSBDebugging(Landroid/content/Context;)V
+
+    # Cheat Tool Detection
+    move-object v0, p0
+    check-cast v0, Landroid/content/Context;
+    invoke-static {v0}, Lcom/nativenerds/develapp/CheatToolDetection;->checkCheatTools(Landroid/content/Context;)Z
+    move-result v1
+
+    if-eqz v1, :show_safe_cheat
+    invoke-static {p0}, Lcom/nativenerds/develapp/CheatToolDetection;->showCheatToolDetectedToast(Landroid/content/Context;)V
+
+    :show_safe_cheat
+    invoke-static {p0}, Lcom/nativenerds/develapp/CheatToolDetection;->showCheatToolNotDetectedToast(Landroid/content/Context;)V
+
+    # Root Detection
+    invoke-static {}, Lcom/nativenerds/develapp/RootDetection;->isDeviceRooted()Z
+    move-result v1
+
+    if-eqz v1, :show_safe_root
+    invoke-static {p0}, Lcom/nativenerds/develapp/RootDetection;->showRootingDetectedToast(Landroid/content/Context;)V
+
+    :show_safe_root
+    invoke-static {p0}, Lcom/nativenerds/develapp/RootDetection;->showRootingNotDetectedToast(Landroid/content/Context;)V
+
+    # Emulator Detection
+    invoke-static {p0}, Lcom/nativenerds/develapp/EmulatorDetection;->isEmulator(Landroid/content/Context;)Z
+    move-result v1
+
+    if-eqz v1, :no_emulator  # Skip if not an emulator
+    invoke-static {p0}, Lcom/nativenerds/develapp/EmulatorDetection;->showEmulatorDetectedToast(Landroid/content/Context;)V
+
+    :no_emulator
+    invoke-static {p0}, Lcom/nativenerds/develapp/EmulatorDetection;->showEmulatorNotDetectedToast(Landroid/content/Context;)V
+    return-void
+.end method

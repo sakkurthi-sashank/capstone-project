@@ -7,6 +7,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests
+from azure.storage.blob import BlobServiceClient
+
 
 app = FastAPI()
 
@@ -27,8 +29,32 @@ class RequestBody(BaseModel):
 
 android_package_name = ""
 
+CONTAINER_NAME = "sih"
+
 OUTPUT_BASE_DIR = "decompiled_apks"
 os.makedirs(OUTPUT_BASE_DIR, exist_ok=True)
+
+
+def upload_to_azure(file_path, blob_name):
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string(
+            "BlobEndpoint=https://sih2024.blob.core.windows.net/;QueueEndpoint=https://sih2024.queue.core.windows.net/;FileEndpoint=https://sih2024.file.core.windows.net/;TableEndpoint=https://sih2024.table.core.windows.net/;SharedAccessSignature=sv=2022-11-02&ss=bfqt&srt=sco&sp=rwdlacupiytfx&se=2026-12-12T14:20:49Z&st=2024-12-12T06:20:49Z&spr=https,http&sig=O1IGlTlJF4YPLVMU%2BuT%2B421XtBr1lT8zzgUfad%2BAvQc%3D"
+        )
+        blob_client = blob_service_client.get_blob_client(
+            container=CONTAINER_NAME, blob=blob_name
+        )
+
+        with open(file_path, "rb") as data:
+            blob_client.upload_blob(data, overwrite=True)
+
+        url = blob_client.url
+        print(f"File uploaded to Azure Blob Storage: {url}")
+        return url
+    except Exception as e:
+        print(f"Error uploading file to Azure Blob Storage: {e}")
+        raise HTTPException(
+            status_code=500, detail="Failed to upload APK to Azure Blob Storage"
+        )
 
 
 def run_command(cmd):
@@ -67,142 +93,82 @@ def sign_apk(apk_path, output_path, keystore_path, alias, password):
     run_command(cmd)
 
 
-# def update_main_activity(main_activity_path):
-
-#     lines_to_insert = f"""
-
-#     invoke-static {{p0}}, L{android_package_name.replace(
-#         ".", "/"
-#     )}/usb_detection;->detectUSBDebugging(Landroid/content/Context;)V
-
-#     move-object v3, p0
-#     check-cast v3, Landroid/content/Context;
-#     invoke-static {{v3}}, L{android_package_name.replace(
-#         ".", "/"
-#     )}/cheat_tool_detection;->checkCheatTools(Landroid/content/Context;)Z
-#     move-result v4
-
-#     if-eqz v4, :show_safe
-
-#     const-string v5, "Cheat tool detected!"
-#     goto :show_toast
-
-#     :show_safe
-#     const-string v5, "No Cheat tool detected, App is safe to use!"
-
-#     :show_toast
-#     const/4 v4, 0x1
-#     invoke-static {{v3, v5, v4}}, Landroid/widget/Toast;->makeText(Landroid/content/Context;Ljava/lang/CharSequence;I)Landroid/widget/Toast;
-#     move-result-object v4
-#     invoke-virtual {{v4}}, Landroid/widget/Toast;->show()V
-
-#     invoke-static {{p0}}, L{android_package_name.replace(
-#         ".", "/"
-#     )}/rooting_detection;->isDeviceRooted()Z
-
-#     move-result v0
-
-#     .line 12
-
-#     if-eqz v0, :cond_safe
-
-#     const-string v1, "Phone is rooted!"
-
-#     goto :cond_show
-
-#     :cond_safe
-#     const-string v1, "Phone is not rooted, safe to use."
-
-#     :cond_show
-#     move-object v2, p0
-
-#     invoke-static {{p0}}, L{android_package_name.replace(
-#         ".", "/"
-#     )}/emulator_detection;->isEmulator(Landroid/content/Context;)Z
-#     move-result v0
-
-#     if-eqz v0, :no_emulator  # If not an emulator, skip the Toast display
-
-#     invoke-static {{p0}}, L{android_package_name.replace(
-#         ".", "/"
-#     )}/emulator_detection;->showEmulatorToast(Landroid/content/Context;)V
-
-#     :no_emulator
-#     """
-
 import os
 
 
 def update_main_activity(main_activity_path):
-    """
-    Updates the MainActivity file with the specified security checks.
 
-    Args:
-        main_activity_path: The path to the MainActivity.java file.
-        android_package_name: The package name of the Android app.
+    lines_to_insert_android_armour = f"""
+.method public static runSecurityChecks(Landroid/content/Context;)V
+.locals 6  # Define sufficient registers for the method
 
-    Raises:
-        ValueError: If the insertion point cannot be found in the MainActivity file.
-    """
-
-    lines_to_insert = f"""
+    # USB Debugging Detection
     invoke-static {{p0}}, L{android_package_name.replace(".", "/")}/usb_detection;->detectUSBDebugging(Landroid/content/Context;)V
 
-    move-object v3, p0
-    check-cast v3, Landroid/content/Context;
-    invoke-static {{v3}}, L{android_package_name.replace(".", "/")}/cheat_tool_detection;->checkCheatTools(Landroid/content/Context;)Z
-    move-result v4
+    # Cheat Tool Detection
+    move-object v0, p0
+    check-cast v0, Landroid/content/Context;
+    invoke-static {{v0}}, L{android_package_name.replace(".", "/")}/cheat_tool_detection;->checkCheatTools(Landroid/content/Context;)Z
+    move-result v1
 
-    if-eqz v4, :show_safe
+    if-eqz v1, :show_safe_cheat
+    invoke-static {{p0}}, L{android_package_name.replace(".", "/")}/cheat_tool_detection;->showCheatToolDetectedToast(Landroid/content/Context;)V
 
-    const-string v5, "Cheat tool detected!"
-    goto :show_toast
+    :show_safe_cheat
+    invoke-static {{p0}}, L{android_package_name.replace(".", "/")}/cheat_tool_detection;->showCheatToolNotDetectedToast(Landroid/content/Context;)V
 
-    :show_safe
-    const-string v5, "No Cheat tool detected, App is safe to use!"
-
-    :show_toast
-    const/4 v4, 0x1
-    invoke-static {{v3, v5, v4}}, Landroid/widget/Toast;->makeText(Landroid/content/Context;Ljava/lang/CharSequence;I)Landroid/widget/Toast;
-    move-result-object v4
-    invoke-virtual {{v4}}, Landroid/widget/Toast;->show()V
-
+    # Root Detection
     invoke-static {{}}, L{android_package_name.replace(".", "/")}/rooting_detection;->isDeviceRooted()Z
-    move-result v0
+    move-result v1
 
-    if-eqz v0, :cond_safe
+    if-eqz v1, :show_safe_root
+    invoke-static {{p0}}, L{android_package_name.replace(".", "/")}/rooting_detection;->showRootingDetectedToast(Landroid/content/Context;)V
 
-    const-string v1, "Phone is rooted!"
-    goto :show_toast_rooting
+    :show_safe_root
+    invoke-static {{p0}}, L{android_package_name.replace(".", "/")}/rooting_detection;->showRootingNotDetectedToast(Landroid/content/Context;)V
 
-    :cond_safe
-    const-string v1, "Phone is not rooted, safe to use."
-
-    :show_toast_rooting
-    const/4 v4, 0x1
-    invoke-static {{v3, v5, v4}}, Landroid/widget/Toast;->makeText(Landroid/content/Context;Ljava/lang/CharSequence;I)Landroid/widget/Toast;
-    move-result-object v4
-    invoke-virtual {{v4}}, Landroid/widget/Toast;->show()V
-
+    # Emulator Detection
     invoke-static {{p0}}, L{android_package_name.replace(".", "/")}/emulator_detection;->isEmulator(Landroid/content/Context;)Z
-    move-result v0
+    move-result v1
 
-    if-eqz v0, :no_emulator  # If not an emulator, skip the Toast display
-
-    invoke-static {{p0}}, L{android_package_name.replace(".", "/")}/emulator_detection;->showEmulatorToast(Landroid/content/Context;)V
+    if-eqz v1, :no_emulator  # Skip if not an emulator
+    invoke-static {{p0}}, L{android_package_name.replace(".", "/")}/emulator_detection;->showEmulatorDetectedToast(Landroid/content/Context;)V
 
     :no_emulator
+    invoke-static {{p0}}, L{android_package_name.replace(".", "/")}/emulator_detection;->showEmulatorNotDetectedToast(Landroid/content/Context;)V
+    return-void
+.end method
     """
+
+    start_index = main_activity_path.find("com")
+    end_index = main_activity_path.rfind(".smali")
+    extracted_path = main_activity_path[start_index:end_index]
+
+    print("extracted_path", extracted_path)
+
+    lines_to_insert = f"""
+    invoke-static {{p0}}, L{extracted_path.replace(".", "/")};->runSecurityChecks(Landroid/content/Context;)V
+    """
+
+    print("lines_to_insert", lines_to_insert)
 
     try:
         with open(main_activity_path, "r") as main_activity_f:
             main_activity_content = main_activity_f.readlines()
 
+        insertion_index = None
+        insertion_index_armour = len(main_activity_content)
+
+        main_activity_content.insert(
+            insertion_index_armour, lines_to_insert_android_armour
+        )
+
         for i, line in enumerate(main_activity_content):
+
+            print("android_package_name", android_package_name)
+
             if (
-                f"invoke-virtual {{p0, v0}}, L{android_package_name.replace(
-                    ".", "/"
-                )}/MainActivity;->setContentView(I)V"
+                f"invoke-virtual {{p0, v0}}, L{extracted_path.replace(".", "/")};->setContentView(I)V"
                 in line
             ):
                 insertion_index = i + 1
@@ -244,6 +210,7 @@ def create_detection_files(base_dir, smali_impl_dir):
         "usb_detection.smali": "usb_detection.txt",
         "cheat_tool_detection.smali": "cheat_tool_detection.txt",
         "rooting_detection.smali": "rooting_detection.txt",
+        "android_armour.smali": "android_armour.txt",
     }
 
     for smali_file, txt_file in files_mapping.items():
@@ -361,9 +328,17 @@ def main(apk_url):
     generate_signing_key(keystore_path, alias, password)
 
     signed_apk_path = "signed_output.apk"
+    upload_url = upload_to_azure(signed_apk_path, "signed_output.apk")
     sign_apk("unsigned_output.apk", signed_apk_path, keystore_path, alias, password)
 
     print(f"APK successfully signed and saved to {signed_apk_path}")
+
+    print("Cleaning up...")
+    # os.remove(apk_path)
+    # os.remove("unsigned_output.apk")
+    # os.rename(temp_dir, os.path.join(OUTPUT_BASE_DIR, "decompiled_apks"))
+
+    return upload_url
 
 
 @app.get("/")
@@ -376,6 +351,11 @@ async def decompile_apk(request: RequestBody):
 
     apk_url = request.apk_url
 
-    main(apk_url)
+    print(f"Decompiling APK from URL: {apk_url}")
 
-    return {"message": "APK decompiled successfully."}
+    signed_apk_url = main(apk_url)
+
+    return {
+        "message": "APK decompiled and uploaded successfully.",
+        "url": signed_apk_url,
+    }
